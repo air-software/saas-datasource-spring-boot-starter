@@ -4,11 +4,15 @@
 
 **在了解完如何使用后请务必仔细阅读[注意事项](#注意事项)和[最佳实践](#最佳实践)**
 
+简单示例项目请前往 <a href="https://gitee.com/air-soft/saas-datasource-samples" target="_blank">saas-datasource-samples</a>
+
+完整解决方案请前往 <a href="https://gitee.com/air-soft/airboot-saas-datasource" target="_blank">Airboot-SaaS-DataSource</a>
+
 ## 介绍
 
 ### 适用场景
 
-`saas-datasource-spring-boot-starter`（以下简称“本工具”）适用于SaaS场景中 **共享数据源，独立Schema** 或 **独立数据源** 的多租户架构，支持多种方式自动或手动切换租户数据源，并可在运行时动态添加租户数据源，使用轻量，简单方便。
+`saas-datasource-spring-boot-starter`（以下简称“本工具”）适用于SaaS场景中 **共享数据源，独立Schema** 或 **独立数据源** 的多租户架构，支持多种方式自动或手动切换租户数据源，并可在**运行时动态添加租户数据源**，使用轻量，简单方便。
 
 注意，本工具并不适用于 **共享Schema，共享数据表** 的SaaS多租户架构（即租户仅在表中用tenantId来区分），如果想采用此架构，可参考或直接使用 <a href="https://gitee.com/air-soft/airboot-saas" target="_blank">Airboot-SaaS</a> ，是基于Mybatis-Plus的一套完整解决方案。
 
@@ -31,7 +35,7 @@
 
 本工具基于 <a href="https://gitee.com/baomidou/dynamic-datasource-spring-boot-starter" target="_blank">dynamic-datasource-spring-boot-starter</a> 和 `Druid数据库连接池`开发，可整合 `Mybatis-Plus` 或 `Mybatis` ，由于这些开源项目也在不断更新中，尤其像`dynamic-datasource-spring-boot-starter`这几年经历过数次大小重构，因此本工具需要针对其不同版本做出适配。
 
-为了兼容可能存在的老旧项目，本工具在1.0.0版本会对应`dynamic-datasource-spring-boot-starter`较早期的版本，而后续更新中会逐步对应不同的版本区间，**使用本工具的开发者请务必确认好当前项目中这几个jar包所对应的版本区间**，具体对应关系如下：
+为了兼容可能存在的老旧项目，本工具在起始版本会对应`dynamic-datasource-spring-boot-starter`较早期的版本，而后续更新中会逐步对应不同的版本区间，**使用本工具的开发者请务必确认好当前项目中这几个jar包所对应的版本区间**，具体对应关系如下：
 
 |  saas-datasource-spring-boot-starter   |  dynamic-datasource-spring-boot-starter  |  mybatis-plus-boot-starter  |  mybatis-spring-boot-starter  |
 |  :----:  |  :----:  |  :----:  |  :----:  |
