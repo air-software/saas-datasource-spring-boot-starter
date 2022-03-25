@@ -15,6 +15,7 @@
  */
 package com.airsoftware.saas.datasource.core;
 
+import com.airsoftware.saas.datasource.context.SaaSDataSource;
 import com.airsoftware.saas.datasource.provider.SaaSDataSourceProvider;
 import com.baomidou.dynamic.datasource.DynamicRoutingDataSource;
 import com.baomidou.dynamic.datasource.spel.DynamicDataSourceSpelParser;
@@ -54,12 +55,20 @@ public class SaaSDataSourceAutoConfiguration {
 	@Bean
     @ConditionalOnMissingBean
     public SaaSDataSourceAnnotationAdvisor saasDataSourceAnnotationAdvisor(DynamicDataSourceSpelParser dynamicDataSourceSpelParser, DynamicDataSourceSpelResolver dynamicDataSourceSpelResolver, DynamicDataSourceProperties properties) {
+	    // 设置拦截器
         SaaSDataSourceAnnotationInterceptor interceptor = new SaaSDataSourceAnnotationInterceptor();
         SaaSDataSourceAnnotationAdvisor advisor = new SaaSDataSourceAnnotationAdvisor(interceptor);
         interceptor.setDynamicDataSourceSpelParser(dynamicDataSourceSpelParser);
         interceptor.setDynamicDataSourceSpelResolver(dynamicDataSourceSpelResolver);
-        interceptor.setDynamicDataSourceProvider(saasDataSourceProvider);
-        interceptor.setDynamicRoutingDataSource((DynamicRoutingDataSource)dynamicRoutingDataSource);
+        // 设置数据源管理器
+        SaaSDataSourceManager manager = new SaaSDataSourceManager();
+        manager.setSaasDataSourceProvider(saasDataSourceProvider);
+        manager.setDynamicRoutingDataSource((DynamicRoutingDataSource)dynamicRoutingDataSource);
+        // 为拦截器设置数据源管理器
+        interceptor.setManager(manager);
+        // 为手动切换工具设置数据源管理器
+        SaaSDataSource.setManager(manager);
+        
         advisor.setOrder(properties.getOrder());
         return advisor;
     }

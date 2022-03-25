@@ -21,7 +21,7 @@ import org.springframework.context.annotation.Import;
 import java.lang.annotation.*;
 
 /**
- * 开启动态数据源
+ * 开启动态数据源<br/>
  * 添加到SpringBootApplication启动类上
  *
  * @author bit

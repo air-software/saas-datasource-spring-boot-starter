@@ -17,10 +17,8 @@ package com.airsoftware.saas.datasource.core;
 
 import com.airsoftware.saas.datasource.annotation.SaaS;
 import com.airsoftware.saas.datasource.context.SaaSDataSource;
-import com.airsoftware.saas.datasource.provider.SaaSDataSourceProvider;
 import com.airsoftware.saas.datasource.util.StringUtil;
 import com.baomidou.dynamic.datasource.DynamicDataSourceClassResolver;
-import com.baomidou.dynamic.datasource.DynamicRoutingDataSource;
 import com.baomidou.dynamic.datasource.spel.DynamicDataSourceSpelParser;
 import com.baomidou.dynamic.datasource.spel.DynamicDataSourceSpelResolver;
 import com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder;
@@ -34,9 +32,7 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 import javax.servlet.http.HttpServletRequest;
-import javax.sql.DataSource;
 import java.lang.reflect.Method;
-import java.util.Map;
 
 /**
  * SaaS数据源AOP核心拦截器
@@ -47,10 +43,7 @@ import java.util.Map;
 public class SaaSDataSourceAnnotationInterceptor implements MethodInterceptor {
     
     @Setter
-    private SaaSDataSourceProvider dynamicDataSourceProvider;
-    
-    @Setter
-    private DynamicRoutingDataSource dynamicRoutingDataSource;
+    private SaaSDataSourceManager manager;
     
     @Setter
     private DynamicDataSourceSpelResolver dynamicDataSourceSpelResolver;
@@ -62,9 +55,10 @@ public class SaaSDataSourceAnnotationInterceptor implements MethodInterceptor {
     
     @Override
     public Object invoke(MethodInvocation invocation) throws Throwable {
+        String dsKey = "";
+        boolean requestAddDataSource = false;
         try {
             String dsKeyField = getDsKeyField(invocation);
-            String dsKey = "";
             
             // Request优先级：Session > Header
             if (RequestContextHolder.getRequestAttributes() != null) {
@@ -73,24 +67,26 @@ public class SaaSDataSourceAnnotationInterceptor implements MethodInterceptor {
                 dsKey = StringUtil.isNotBlank(sessionValue) ? sessionValue : request.getHeader(dsKeyField);
             }
             
-            // 手动设置数据源优先级最高
+            // SaaSDataSource手动设置数据源优先级最高，因此如果SaaSDataSource当前栈顶有值，则忽略Request设置值，否则按Request设置值切换上下文
             String currentContext = SaaSDataSource.current();
-            if (StringUtil.isNotBlank(currentContext)) {
-                dsKey = currentContext;
-            }
-            
-            if (StringUtil.isNotBlank(dsKey)) {
-                // 初始化该key对应的数据源
-                initDataSource(dsKey);
+            if (StringUtil.isBlank(currentContext) && StringUtil.isNotBlank(dsKey)) {
+                // 添加该key对应的数据源
+                manager.addDataSource(dsKey);
+                // 添加成功则设置此标识为true，用于在finally中判断是否需要清理
+                requestAddDataSource = true;
                 // 切换上下文
                 DynamicDataSourceContextHolder.setDataSourceLookupKey(dsKey);
             }
+            
             return invocation.proceed();
         } catch (Exception e) {
             log.error("An exception occurred during the invocation of @SaaS, data source will switch to default.", e);
             return invocation.proceed();
         } finally {
-            DynamicDataSourceContextHolder.clearDataSourceLookupKey();
+            // 如果Request模式切添加数据源成功，则需要做最后的清理
+            if (requestAddDataSource) {
+                DynamicDataSourceContextHolder.clearDataSourceLookupKey();
+            }
         }
     }
     
@@ -110,20 +106,4 @@ public class SaaSDataSourceAnnotationInterceptor implements MethodInterceptor {
         return saas.value();
     }
     
-    /**
-     * 根据key初始化数据源
-     *
-     * @param dsKey
-     */
-    private void initDataSource(String dsKey) {
-        Map<String, DataSource> dsMap = dynamicRoutingDataSource.getCurrentDataSources();
-        // 如果已被缓存则直接返回
-        if (dsMap != null && dsMap.containsKey(dsKey)) {
-            return;
-        }
-        
-        // 由开发者自行实现此接口来提供数据源
-        DataSource ds = dynamicDataSourceProvider.createDataSource(dsKey);
-        dynamicRoutingDataSource.addDataSource(dsKey, ds);
-    }
 }
