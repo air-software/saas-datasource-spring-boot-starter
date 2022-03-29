@@ -41,7 +41,7 @@ public class SaaSDataSourceManager {
      * @param dsKey
      */
     public void addDataSource(String dsKey) {
-        Map<String, DataSource> dsMap = dynamicRoutingDataSource.getCurrentDataSources();
+        Map<String, DataSource> dsMap = dynamicRoutingDataSource.getDataSources();
         // 如果已被缓存则直接返回
         if (dsMap != null && dsMap.containsKey(dsKey)) {
             return;

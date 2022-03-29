@@ -39,6 +39,7 @@
 
 |  saas-datasource-spring-boot-starter   |  dynamic-datasource-spring-boot-starter  |  mybatis-plus-boot-starter  |  mybatis-spring-boot-starter  |
 |  :----:  |  :----:  |  :----:  |  :----:  |
+| 1.3.0  | version in (3.1.1, 3.4.1] |  version <= 3.5.1 (latest)  | version <= 2.2.2 (latest) |
 | 1.2.0  | version in (2.4.2, 3.1.1] |  version <= 3.5.1 (latest)  | version <= 2.2.2 (latest) |
 | 1.1.0 & 1.0.0  | version <= 2.4.2 | <div align="left">根据`@SaaS`注解的位置分为两种情况：<br/>1. 如果注解在Mapper上，则 version <= 3.0.7.1，若高于此版本dynamic-datasource会报错；<br/>2. 如果注解不在Mapper上，则可使用目前最新版本 version <= 3.5.1 (latest)。<br/>按[最佳实践](#最佳实践)，推荐上述第二种情况，注解不要放在Mapper上。</div>  | version <= 2.2.2 (latest) |
 
@@ -50,7 +51,7 @@
 <dependency>
     <groupId>com.air-software</groupId>
     <artifactId>saas-datasource-spring-boot-starter</artifactId>
-    <version>1.2.0</version>
+    <version>1.3.0</version>
 </dependency>
 ```
 
@@ -72,7 +73,6 @@ spring:
           url: jdbc:mysql://localhost/saas_common?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&serverTimezone=GMT%2B8&autoReconnect=true&autoReconnectForPools=true&allowMultiQueries=true
           username: root
           password: 123456
-          driver-class-name: com.mysql.jdbc.Driver
       druid:
         filters: stat
         initial-size: 1
@@ -116,7 +116,6 @@ public class MySaaSDataSourceProvider implements SaaSDataSourceProvider {
         dataSourceProperty.setUrl(jdbcUrl);
         dataSourceProperty.setUsername(dataSourceConfig.getUsername());
         dataSourceProperty.setPassword(dataSourceConfig.getPassword());
-        dataSourceProperty.setDriverClassName(dataSourceConfig.getDriverClassName());
         dataSourceProperty.setPoolName(dsKey);
         
         return saasDataSourceCreator.createDruidDataSource(dataSourceProperty);
@@ -198,9 +197,16 @@ public class SaaSApplication {
 
 ## 更新日志
 
+### 1.3.0
+
+- 更新并适配`dynamic-datasource-spring-boot-starter`至`3.4.1`版本；
+- 更新并适配`spring-boot-starter-web`至`2.1.1.RELEASE`版本；
+- 新增`SaaSDataSourceClassResolver`来解析注解标记的类，原因是`dynamic-datasource-spring-boot-starter`在`3.1.1`版本后删除了本工具之前使用的对应API，所以只能本工具自己再实现一个；
+- 支持`SPI`，开发者可以省略`driverClassName`配置了。
+
 ### 1.2.0
 
-- 更新并适配`dynamic-datasource-spring-boot-starter`至3.1.1版本；
+- 更新并适配`dynamic-datasource-spring-boot-starter`至`3.1.1`版本；
 - 优化了`SaaSDataSource`，底层改为使用`ArrayDeque`来实现栈；
 - 增加`SaaSDataSource.removeAll`方法，可强制移除所有数据源，包含DynamicDataSource上下文中的数据源。如果你不确定业务流程完成后是否还有残留数据，可在最后（比如拦截器的`afterCompletion`中）调用此方法来确保移除。
 

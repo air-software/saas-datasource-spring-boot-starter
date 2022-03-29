@@ -18,7 +18,6 @@ package com.airsoftware.saas.datasource.core;
 import com.airsoftware.saas.datasource.annotation.SaaS;
 import com.airsoftware.saas.datasource.context.SaaSDataSource;
 import com.airsoftware.saas.datasource.util.StringUtil;
-import com.baomidou.dynamic.datasource.support.DataSourceClassResolver;
 import com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -43,7 +42,7 @@ public class SaaSDataSourceAnnotationInterceptor implements MethodInterceptor {
     @Setter
     private SaaSDataSourceManager manager;
     
-    private DataSourceClassResolver dataSourceClassResolver = new DataSourceClassResolver();
+    private SaaSDataSourceClassResolver classResolver = new SaaSDataSourceClassResolver();
     
     @Override
     public Object invoke(MethodInvocation invocation) throws Throwable {
@@ -91,7 +90,7 @@ public class SaaSDataSourceAnnotationInterceptor implements MethodInterceptor {
      */
     private String getDsKeyField(MethodInvocation invocation) throws Throwable {
         Method method = invocation.getMethod();
-        Class<?> declaringClass = dataSourceClassResolver.targetClass(invocation);
+        Class<?> declaringClass = classResolver.targetClass(invocation);
         SaaS saas = method.isAnnotationPresent(SaaS.class) ? method.getAnnotation(SaaS.class)
                 : AnnotationUtils.findAnnotation(declaringClass, SaaS.class);
         Assert.notNull(saas, "Can not find @SaaS annotation, please ensure that you put the @SaaS annotation in right place.");

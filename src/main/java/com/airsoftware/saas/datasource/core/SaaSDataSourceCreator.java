@@ -26,7 +26,6 @@ import javax.sql.DataSource;
  *
  * @author bit
  */
-
 public class SaaSDataSourceCreator {
     
     private DynamicDataSourceProperties properties;
@@ -42,7 +41,7 @@ public class SaaSDataSourceCreator {
      * @return 数据源
      */
     public DataSource createDruidDataSource(DataSourceProperty dataSourceProperty) {
-        DruidDataSourceCreator druidDataSourceCreator = new DruidDataSourceCreator(properties.getDruid());
+        DruidDataSourceCreator druidDataSourceCreator = new DruidDataSourceCreator(properties);
         dataSourceProperty.setDruid(properties.getDruid());
         return druidDataSourceCreator.createDataSource(dataSourceProperty);
     }
