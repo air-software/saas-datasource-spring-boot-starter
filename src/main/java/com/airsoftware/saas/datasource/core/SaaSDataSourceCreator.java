@@ -15,7 +15,7 @@
  */
 package com.airsoftware.saas.datasource.core;
 
-import com.baomidou.dynamic.datasource.DynamicDataSourceCreator;
+import com.baomidou.dynamic.datasource.creator.DruidDataSourceCreator;
 import com.baomidou.dynamic.datasource.spring.boot.autoconfigure.DataSourceProperty;
 import com.baomidou.dynamic.datasource.spring.boot.autoconfigure.DynamicDataSourceProperties;
 
@@ -42,9 +42,8 @@ public class SaaSDataSourceCreator {
      * @return 数据源
      */
     public DataSource createDruidDataSource(DataSourceProperty dataSourceProperty) {
-        DynamicDataSourceCreator dynamicDataSourceCreator = new DynamicDataSourceCreator();
-        dynamicDataSourceCreator.setDruidGlobalConfig(properties.getDruid());
+        DruidDataSourceCreator druidDataSourceCreator = new DruidDataSourceCreator(properties.getDruid());
         dataSourceProperty.setDruid(properties.getDruid());
-        return dynamicDataSourceCreator.createDruidDataSource(dataSourceProperty);
+        return druidDataSourceCreator.createDataSource(dataSourceProperty);
     }
 }

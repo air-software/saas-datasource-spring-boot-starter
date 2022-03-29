@@ -18,33 +18,39 @@ package com.airsoftware.saas.datasource.context;
 import com.airsoftware.saas.datasource.core.SaaSDataSourceManager;
 import com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder;
 import lombok.Setter;
+import org.springframework.core.NamedThreadLocal;
 
-import java.util.concurrent.LinkedBlockingDeque;
+import java.util.ArrayDeque;
+import java.util.Deque;
 
 /**
  * SaaS数据源手动切换工具<br/>
- * 用于手动切换数据源，可在同一调用流程内多次切换数据源，注意在开启了事务的方法内切换无效。
+ * 用于手动切换数据源，可在同一调用流程内多次切换数据源，注意在开启了事务的方法内切换无效且可能导致异常。
  *
  * @author bit
  */
-public class SaaSDataSource {
+public final class SaaSDataSource {
     
     @Setter
     private static SaaSDataSourceManager manager;
     
     /**
-     * 模拟栈存储手动切换的数据源<br/>
+     * 使用栈存储手动切换的数据源<br/>
      * 在一次调用流程中，如果启用了手动切换，则后续只会以手动切换为准，除非显式调用clearCurrent或clearAll。<br/>
      * 如果一次调用流程中多次设置手动切换，则clearCurrent会移除栈顶数据，clearAll会清空整个栈。
      */
-    private static ThreadLocal<LinkedBlockingDeque<String>> DS_KEY_HOLDER = ThreadLocal.withInitial(LinkedBlockingDeque::new);
+    private static final ThreadLocal<Deque<String>> DS_KEY_HOLDER = new NamedThreadLocal<Deque<String>>("saas-datasource") {
+        @Override
+        protected Deque<String> initialValue() {
+            return new ArrayDeque<>();
+        }
+    };
     
     /**
      * 获取当前栈顶的数据源标识
      */
     public static String current() {
-        LinkedBlockingDeque<String> deque = DS_KEY_HOLDER.get();
-        return deque.isEmpty() ? null : deque.getFirst();
+        return DS_KEY_HOLDER.get().peek();
     }
     
     /**
@@ -79,9 +85,9 @@ public class SaaSDataSource {
         // 设置时即添加数据源
         manager.addDataSource(dsKey);
         // 入栈
-        DS_KEY_HOLDER.get().addFirst(dsKey);
+        DS_KEY_HOLDER.get().push(dsKey);
         // 设置DynamicDataSource上下文，实际数据库操作时以此为准，其内部也是一个栈
-        DynamicDataSourceContextHolder.setDataSourceLookupKey(dsKey);
+        DynamicDataSourceContextHolder.push(dsKey);
     }
     
     /**
@@ -89,13 +95,12 @@ public class SaaSDataSource {
      * 如果当前线程是连续手动切换数据源，只会移除掉当前栈顶生效的数据源。
      */
     public static void clearCurrent() {
-        LinkedBlockingDeque<String> deque = DS_KEY_HOLDER.get();
+        Deque<String> deque = DS_KEY_HOLDER.get();
+        deque.poll();
         if (deque.isEmpty()) {
             DS_KEY_HOLDER.remove();
-        } else {
-            deque.pollFirst();
         }
-        DynamicDataSourceContextHolder.clearDataSourceLookupKey();
+        DynamicDataSourceContextHolder.poll();
     }
     
     /**
@@ -103,15 +108,27 @@ public class SaaSDataSource {
      * 如果当前线程是连续手动切换数据源，则会清空整个栈。
      */
     public static void clearAll() {
-        LinkedBlockingDeque<String> deque = DS_KEY_HOLDER.get();
+        Deque<String> deque = DS_KEY_HOLDER.get();
         // 根据本工具当前栈的深度，将DynamicDataSource上下文中手动设置进去的数据源依次出栈
         int size = deque.size();
         for (int i = 0; i < size; i++) {
-            DynamicDataSourceContextHolder.clearDataSourceLookupKey();
+            DynamicDataSourceContextHolder.poll();
         }
         // 清空本工具的栈，并移除线程
         deque.clear();
         DS_KEY_HOLDER.remove();
+    }
+    
+    /**
+     * 强制移除所有数据源，包含DynamicDataSource上下文中的数据源。
+     */
+    public static void removeAll() {
+        Deque<String> deque = DS_KEY_HOLDER.get();
+        // 清空本工具的栈，并移除线程
+        deque.clear();
+        DS_KEY_HOLDER.remove();
+        // 移除DynamicDataSource上下文
+        DynamicDataSourceContextHolder.clear();
     }
     
 }

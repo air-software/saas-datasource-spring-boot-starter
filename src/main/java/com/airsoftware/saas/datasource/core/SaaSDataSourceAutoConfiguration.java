@@ -18,8 +18,6 @@ package com.airsoftware.saas.datasource.core;
 import com.airsoftware.saas.datasource.context.SaaSDataSource;
 import com.airsoftware.saas.datasource.provider.SaaSDataSourceProvider;
 import com.baomidou.dynamic.datasource.DynamicRoutingDataSource;
-import com.baomidou.dynamic.datasource.spel.DynamicDataSourceSpelParser;
-import com.baomidou.dynamic.datasource.spel.DynamicDataSourceSpelResolver;
 import com.baomidou.dynamic.datasource.spring.boot.autoconfigure.DynamicDataSourceAutoConfiguration;
 import com.baomidou.dynamic.datasource.spring.boot.autoconfigure.DynamicDataSourceProperties;
 import com.baomidou.dynamic.datasource.spring.boot.autoconfigure.druid.DruidDynamicDataSourceConfiguration;
@@ -54,12 +52,10 @@ public class SaaSDataSourceAutoConfiguration {
 	
 	@Bean
     @ConditionalOnMissingBean
-    public SaaSDataSourceAnnotationAdvisor saasDataSourceAnnotationAdvisor(DynamicDataSourceSpelParser dynamicDataSourceSpelParser, DynamicDataSourceSpelResolver dynamicDataSourceSpelResolver, DynamicDataSourceProperties properties) {
+    public SaaSDataSourceAnnotationAdvisor saasDataSourceAnnotationAdvisor(DynamicDataSourceProperties properties) {
 	    // 设置拦截器
         SaaSDataSourceAnnotationInterceptor interceptor = new SaaSDataSourceAnnotationInterceptor();
         SaaSDataSourceAnnotationAdvisor advisor = new SaaSDataSourceAnnotationAdvisor(interceptor);
-        interceptor.setDynamicDataSourceSpelParser(dynamicDataSourceSpelParser);
-        interceptor.setDynamicDataSourceSpelResolver(dynamicDataSourceSpelResolver);
         // 设置数据源管理器
         SaaSDataSourceManager manager = new SaaSDataSourceManager();
         manager.setSaasDataSourceProvider(saasDataSourceProvider);

@@ -39,6 +39,7 @@
 
 |  saas-datasource-spring-boot-starter   |  dynamic-datasource-spring-boot-starter  |  mybatis-plus-boot-starter  |  mybatis-spring-boot-starter  |
 |  :----:  |  :----:  |  :----:  |  :----:  |
+| 1.2.0  | version in (2.4.2, 3.1.1] |  version <= 3.5.1 (latest)  | version <= 2.2.2 (latest) |
 | 1.1.0 & 1.0.0  | version <= 2.4.2 | <div align="left">根据`@SaaS`注解的位置分为两种情况：<br/>1. 如果注解在Mapper上，则 version <= 3.0.7.1，若高于此版本dynamic-datasource会报错；<br/>2. 如果注解不在Mapper上，则可使用目前最新版本 version <= 3.5.1 (latest)。<br/>按[最佳实践](#最佳实践)，推荐上述第二种情况，注解不要放在Mapper上。</div>  | version <= 2.2.2 (latest) |
 
 ## 快速使用
@@ -49,7 +50,7 @@
 <dependency>
     <groupId>com.air-software</groupId>
     <artifactId>saas-datasource-spring-boot-starter</artifactId>
-    <version>1.1.0</version>
+    <version>1.2.0</version>
 </dependency>
 ```
 
@@ -115,8 +116,8 @@ public class MySaaSDataSourceProvider implements SaaSDataSourceProvider {
         dataSourceProperty.setUrl(jdbcUrl);
         dataSourceProperty.setUsername(dataSourceConfig.getUsername());
         dataSourceProperty.setPassword(dataSourceConfig.getPassword());
-        // 此处存在拼写错误，应为poolName，在dynamic-datasource的后续版本中有修复。
-        dataSourceProperty.setPollName(dsKey);
+        dataSourceProperty.setDriverClassName(dataSourceConfig.getDriverClassName());
+        dataSourceProperty.setPoolName(dsKey);
         
         return saasDataSourceCreator.createDruidDataSource(dataSourceProperty);
     }
@@ -182,7 +183,7 @@ public class SaaSApplication {
 
 以下注意事项**非常重要**，请开发者务必仔细阅读：
 
-1. 公共库中的表最好不要跟租户库中的业务表有重合，因为当切换数据源失败时，会自动切换回应用启动时配置的默认数据源（通常为公共库），此时如果公共库中存在同名业务表的话，那在明面上是不会报错的，只不过数据都到公共库里了，这样不利于排查问题。
+1. 公共库中的表最好不要跟租户库中的业务表有重合，因为当切换数据源失败时，会自动退回至最近一次切换生效的数据源。如果此前未做过任何方式的切换，则退回至应用启动时配置的默认数据源（通常为公共库）。此时若公共库中存在同名业务表的话，那在明面上是不会报错的，只不过数据都到公共库里了，这样不利于排查问题。
 2. 为安全起见，尽量不要使用Header模式，因为前端传递的数据永远是不可信的。如果要使用前端直接传递的值，一定要配合权限控制，比如整个系统的超级管理员想要自由切换至不同租户，此时就需要使用前端传值。这也是我保留了Header模式，但优先级降为最低的原因。
 3. **事务中无法切换数据源，强行切换可能会导致报错。**首先一定要注意`@SaaS`的标记位置，至少应在最外层事务或更上一层的调用方标记此注解，即保证注解在事务开启前发挥作用，以切换到正确的数据源。其次不要在事务内调用`SaaSDataSource.switchTo`，而应在事务开启前调用。**如果没有在事务开启前通过注解或手动切换至正确的数据源，则事务会在默认数据源上执行。**
 4. 本工具**不提供分布式事务的实现**，也未做过相关测试，如果需要分布式事务请开发者自行实现和测试，理论上本工具兼容分布式事务。
@@ -196,6 +197,12 @@ public class SaaSApplication {
 2. 现代Web项目中使用Token的情况已逐步超过Session，在Token场景下，我们可以将`dsKey`放入Token中，或为安全起见将`dsKey`放入Redis，而Redis Key放入Token中。随后我们在拦截器中解析Token之后，使用获得的`dsKey`调用`SaaSDataSource.switchTo`来切换数据源，这样在编写业务代码时就无需关心租户切换问题了，最后不要忘了在拦截器的`afterCompletion`中调用`SaaSDataSource.clearAll`方法（`1.0.0`版本是`SaaSDataSource.clear`）。
 
 ## 更新日志
+
+### 1.2.0
+
+- 更新并适配`dynamic-datasource-spring-boot-starter`至3.1.1版本；
+- 优化了`SaaSDataSource`，底层改为使用`ArrayDeque`来实现栈；
+- 增加`SaaSDataSource.removeAll`方法，可强制移除所有数据源，包含DynamicDataSource上下文中的数据源。如果你不确定业务流程完成后是否还有残留数据，可在最后（比如拦截器的`afterCompletion`中）调用此方法来确保移除。
 
 ### 1.1.0
 

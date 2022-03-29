@@ -18,9 +18,7 @@ package com.airsoftware.saas.datasource.core;
 import com.airsoftware.saas.datasource.annotation.SaaS;
 import com.airsoftware.saas.datasource.context.SaaSDataSource;
 import com.airsoftware.saas.datasource.util.StringUtil;
-import com.baomidou.dynamic.datasource.DynamicDataSourceClassResolver;
-import com.baomidou.dynamic.datasource.spel.DynamicDataSourceSpelParser;
-import com.baomidou.dynamic.datasource.spel.DynamicDataSourceSpelResolver;
+import com.baomidou.dynamic.datasource.support.DataSourceClassResolver;
 import com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -45,13 +43,7 @@ public class SaaSDataSourceAnnotationInterceptor implements MethodInterceptor {
     @Setter
     private SaaSDataSourceManager manager;
     
-    @Setter
-    private DynamicDataSourceSpelResolver dynamicDataSourceSpelResolver;
-    
-    @Setter
-    private DynamicDataSourceSpelParser dynamicDataSourceSpelParser;
-    
-    private DynamicDataSourceClassResolver dynamicDataSourceClassResolver = new DynamicDataSourceClassResolver();
+    private DataSourceClassResolver dataSourceClassResolver = new DataSourceClassResolver();
     
     @Override
     public Object invoke(MethodInvocation invocation) throws Throwable {
@@ -75,17 +67,17 @@ public class SaaSDataSourceAnnotationInterceptor implements MethodInterceptor {
                 // 添加成功则设置此标识为true，用于在finally中判断是否需要清理
                 requestAddDataSource = true;
                 // 切换上下文
-                DynamicDataSourceContextHolder.setDataSourceLookupKey(dsKey);
+                DynamicDataSourceContextHolder.push(dsKey);
             }
             
             return invocation.proceed();
         } catch (Exception e) {
-            log.error("An exception occurred during the invocation of @SaaS, data source will switch to default.", e);
+            log.error("An exception occurred during the invocation of @SaaS, the JDBC Connection will switch to latest active or default data source.", e);
             return invocation.proceed();
         } finally {
             // 如果Request模式切添加数据源成功，则需要做最后的清理
             if (requestAddDataSource) {
-                DynamicDataSourceContextHolder.clearDataSourceLookupKey();
+                DynamicDataSourceContextHolder.poll();
             }
         }
     }
@@ -99,7 +91,7 @@ public class SaaSDataSourceAnnotationInterceptor implements MethodInterceptor {
      */
     private String getDsKeyField(MethodInvocation invocation) throws Throwable {
         Method method = invocation.getMethod();
-        Class<?> declaringClass = dynamicDataSourceClassResolver.targetClass(invocation);
+        Class<?> declaringClass = dataSourceClassResolver.targetClass(invocation);
         SaaS saas = method.isAnnotationPresent(SaaS.class) ? method.getAnnotation(SaaS.class)
                 : AnnotationUtils.findAnnotation(declaringClass, SaaS.class);
         Assert.notNull(saas, "Can not find @SaaS annotation, please ensure that you put the @SaaS annotation in right place.");
