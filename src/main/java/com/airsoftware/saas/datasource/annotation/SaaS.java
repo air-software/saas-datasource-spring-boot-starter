@@ -35,6 +35,6 @@ public @interface SaaS {
      * 租户标识字段名称，即Request Session或Header中对应的字段名称。<br/>
      * 如果使用 {@link com.airsoftware.saas.datasource.context.SaaSDataSource} 来手动切换数据源，则此值会被忽略。
      */
-    String value() default "dsKey";
+    String value();
     
 }

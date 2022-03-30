@@ -8,6 +8,8 @@
 
 完整解决方案请前往 <a href="https://gitee.com/air-soft/airboot-saas-datasource" target="_blank">Airboot-SaaS-DataSource</a>
 
+目前`1.x`版本主要支持`Druid`，后续会考虑增加对`HikariCp`、`BeeCp`及`Dbcp2`的支持。
+
 ## 介绍
 
 ### 适用场景
@@ -39,6 +41,7 @@
 
 |  saas-datasource-spring-boot-starter   |  dynamic-datasource-spring-boot-starter  |  mybatis-plus-boot-starter  |  mybatis-spring-boot-starter  |
 |  :----:  |  :----:  |  :----:  |  :----:  |
+| 1.4.0  | version in (3.4.1, 3.5.1 (latest)] |  version <= 3.5.1 (latest)  | version <= 2.2.2 (latest) |
 | 1.3.0  | version in (3.1.1, 3.4.1] |  version <= 3.5.1 (latest)  | version <= 2.2.2 (latest) |
 | 1.2.0  | version in (2.4.2, 3.1.1] |  version <= 3.5.1 (latest)  | version <= 2.2.2 (latest) |
 | 1.1.0 & 1.0.0  | version <= 2.4.2 | <div align="left">根据`@SaaS`注解的位置分为两种情况：<br/>1. 如果注解在Mapper上，则 version <= 3.0.7.1，若高于此版本dynamic-datasource会报错；<br/>2. 如果注解不在Mapper上，则可使用目前最新版本 version <= 3.5.1 (latest)。<br/>按[最佳实践](#最佳实践)，推荐上述第二种情况，注解不要放在Mapper上。</div>  | version <= 2.2.2 (latest) |
@@ -51,7 +54,7 @@
 <dependency>
     <groupId>com.air-software</groupId>
     <artifactId>saas-datasource-spring-boot-starter</artifactId>
-    <version>1.3.0</version>
+    <version>1.4.0</version>
 </dependency>
 ```
 
@@ -96,6 +99,17 @@ spring:
 开发者需自行实现SaaS多租户数据源提供者，一个简单的实现示例如下：
 
 ```
+import com.airsoftware.saas.datasource.core.SaaSDataSourceCreator;
+import com.airsoftware.saas.datasource.provider.SaaSDataSourceProvider;
+import com.airsoftware.saas.datasource.sample.entity.DataSourceConfig;
+import com.airsoftware.saas.datasource.sample.mapper.DataSourceConfigMapper;
+import com.baomidou.dynamic.datasource.spring.boot.autoconfigure.DataSourceProperty;
+import org.springframework.stereotype.Component;
+
+import javax.annotation.Resource;
+import javax.sql.DataSource;
+
+
 @Component
 public class MySaaSDataSourceProvider implements SaaSDataSourceProvider {
     
@@ -131,7 +145,7 @@ public class MySaaSDataSourceProvider implements SaaSDataSourceProvider {
 public interface DataSourceConfigMapper
 ```
 
-另外如果你使用的是`1.1.0`及以上版本，可以直接使用`SaaSDataSource.switchTo`来强制切换至公共库，记得切换后立即调用`clearCurrent`清理一下：
+另外如果你使用的是`1.1.0`及以上版本，也可以直接使用`SaaSDataSource.switchTo`来强制切换至公共库，记得切换后立即调用`clearCurrent`清理一下：
 
 ```
 SaaSDataSource.switchTo("common");
@@ -156,7 +170,19 @@ public class SaaSApplication {
 }
 ```
 
-如果你想使用Request Session或Header的方式切换数据源，则在需要切换数据源的类或方法上标记`@SaaS`注解，此注解中可设置**租户标识字段名称**，默认值为`dsKey`。
+如果你想使用Request Session或Header的方式切换数据源，则在需要切换数据源的类或方法上标记`@SaaS`注解，使用此注解时必须显式指定**租户标识字段名称**。举例如下：
+
+```
+@SaaS("tenantId")
+@RestController
+@RequestMapping("/user")
+public class UserController {
+
+    ......
+    ......
+
+}
+```
 
 比如我在使用注解时设置为`@SaaS("tenantId")`，那么我在Request Session或Header中就需要用`tenantId`字段来设置租户标识，而这个租户标识在首次切换至此租户时，会传递至你自己实现的`SaaSDataSourceProvider`中，以此来获取租户对应数据源。
 
@@ -164,43 +190,63 @@ public class SaaSApplication {
 
 本工具共提供三种方式来切换数据源，按优先级从高到底排列如下：
 
-- SaaSDataSource.switchTo(String/Long dsKey)
+- SaaSDataSource.switchTo(String/Long/Integer dsKey)
 - Request Session
 - Request Header
 
-你可以在任意地方多次调用`SaaSDataSource.switchTo`来手动切换数据源，他会影响到你下一次即将执行的数据库操作，常用于拦截器、定时任务、异步操作、循环刷库，跨库统计、消息消费等场景。
+你可以在任意地方多次调用`SaaSDataSource.switchTo`来手动切换数据源，他会影响到你下一次即将执行的数据库操作，**常用于拦截器、定时任务、异步操作、循环刷库，跨库统计、消息消费等场景。**
 
-`SaaSDataSource`内部模拟了一个栈来存储多次切换的数据源，`switchTo`方法入栈，`current`方法获取当前栈顶数据，`clearCurrent`方法会让当前栈顶数据出栈，`clearAll`方法会清理整个栈。
+`SaaSDataSource`内部使用了栈来存储多次切换的数据源，`switchTo`方法入栈，`current`方法获取当前栈顶数据，`clearCurrent`方法会让当前栈顶数据出栈，`clearAll`方法会清理整个栈。
 
 建议在每次手动切换完成，且对应数据源的业务处理完成后，调用`clearCurrent`来清理刚刚手动切换的数据源，以避免对后续流程产生影响。或者也可以在整个业务流程的最后调用`clearAll`。
 
 **注意**：在`1.1.0`及以上版本，如果你只使用`SaaSDataSource`来手动切换数据库，则不需要再标记`@SaaS`注解，即使标记了注解，注解中的值也会被忽略。
 
-而在`1.0.0`版本，则仍需要标记`@SaaS`注解，切必须在注解生效前执行`SaaSDataSource.switchTo`。
+而在`1.0.0`版本，则仍需要在调用`SaaSDataSource.switchTo`之后的流程中标记`@SaaS`注解，即必须在注解生效前执行`SaaSDataSource.switchTo`。
 
 ## 注意事项
 
 以下注意事项**非常重要**，请开发者务必仔细阅读：
 
-1. 公共库中的表最好不要跟租户库中的业务表有重合，因为当切换数据源失败时，会自动退回至最近一次切换生效的数据源。如果此前未做过任何方式的切换，则退回至应用启动时配置的默认数据源（通常为公共库）。此时若公共库中存在同名业务表的话，那在明面上是不会报错的，只不过数据都到公共库里了，这样不利于排查问题。
-2. 为安全起见，尽量不要使用Header模式，因为前端传递的数据永远是不可信的。如果要使用前端直接传递的值，一定要配合权限控制，比如整个系统的超级管理员想要自由切换至不同租户，此时就需要使用前端传值。这也是我保留了Header模式，但优先级降为最低的原因。
-3. **事务中无法切换数据源，强行切换可能会导致报错。**首先一定要注意`@SaaS`的标记位置，至少应在最外层事务或更上一层的调用方标记此注解，即保证注解在事务开启前发挥作用，以切换到正确的数据源。其次不要在事务内调用`SaaSDataSource.switchTo`，而应在事务开启前调用。**如果没有在事务开启前通过注解或手动切换至正确的数据源，则事务会在默认数据源上执行。**
-4. 本工具**不提供分布式事务的实现**，也未做过相关测试，如果需要分布式事务请开发者自行实现和测试，理论上本工具兼容分布式事务。
-5. 在定时任务、异步操作、消息消费等无法获取Request上下文的场景下，**一定要记得处理业务前调用`SaaSDataSource.switchTo`来手动切换数据源**。
+- 公共库中的表最好不要跟租户库中的业务表有重合，因为当切换数据源失败时，会自动退回至最近一次切换生效的数据源。如果此前未做过任何方式的切换，则退回至应用启动时配置的默认数据源（通常为公共库）。此时若公共库中存在同名业务表的话，那在明面上是不会报错的，只不过数据都到公共库里了，这样不利于排查问题。
+- 为安全起见，尽量不要使用Header模式，因为前端传递的数据永远是不可信的。如果要使用前端直接传递的值，一定要配合权限控制，比如整个系统的超级管理员想要自由切换至不同租户，此时就需要使用前端传值。这也是我保留了Header模式，但优先级降为最低的原因。
+- **事务中无法切换数据源，强行切换可能会导致异常**。首先一定要注意`@SaaS`的标记位置，至少应在最外层事务或更上一层的调用方标记此注解，即保证注解在事务开启前发挥作用，以切换到正确的数据源。其次不要在事务内调用`SaaSDataSource.switchTo`，而应在事务开启前调用。**如果没有在事务开启前通过注解或手动切换至正确的数据源，则事务会在默认数据源上执行。**
+- 本工具**不提供分布式事务的实现**，也未做过相关测试，如果需要分布式事务请开发者自行实现和测试，理论上本工具兼容分布式事务。
+- 在定时任务、异步操作、消息消费等无法获取Request上下文的场景下，**一定要记得处理业务前调用`SaaSDataSource.switchTo`来手动切换至想要操作的数据源**。
+- `spring-boot`在`2.6.x`版本后默认禁止了循环依赖，这可能会导致使用本工具时启动报错，**我在`1.4.0`版本中修复了此问题**。如果你使用的是`1.3.0`及以下版本，可在配置文件中显式指定：
+```
+spring:
+  main:
+    allow-circular-references: true
+```
+或在实现数据源提供者`SaaSDataSourceProvider`时，将`SaaSDataSourceCreator`标记为懒加载：
+```
+@Lazy
+@Resource
+private SaaSDataSourceCreator saasDataSourceCreator;
+```
 
 ## 最佳实践
 
 基于上述注意事项，结合现代Web开发的技术倾向，可以得出以下几条最佳实践：
 
-1. 为保障注解在事务开启前发挥作用，**在Web项目中推荐将`@SaaS`标记在`Controller`层**，一般这就是事务的顶层了。大部分项目中都会有一个`BaseController`作为所有Controller的父类，将`@SaaS`注解标记在父类上，对所有Controller都会起作用。
-2. 现代Web项目中使用Token的情况已逐步超过Session，在Token场景下，我们可以将`dsKey`放入Token中，或为安全起见将`dsKey`放入Redis，而Redis Key放入Token中。随后我们在拦截器中解析Token之后，使用获得的`dsKey`调用`SaaSDataSource.switchTo`来切换数据源，这样在编写业务代码时就无需关心租户切换问题了，最后不要忘了在拦截器的`afterCompletion`中调用`SaaSDataSource.clearAll`方法（`1.0.0`版本是`SaaSDataSource.clear`）。
+- 为保障注解在事务开启前发挥作用，**在Web项目中推荐将`@SaaS`标记在`Controller`层**，一般这就是事务的顶层了。大部分项目中都会有一个`BaseController`作为所有Controller的父类，将`@SaaS`注解标记在父类上，对所有Controller都会起作用。
+- 现代Web项目中使用Token的情况已逐步超过Session，在Token场景下，我们可以将`dsKey`放入Token中，或为安全起见将`dsKey`放入Redis，而Redis Key放入Token中。随后我们在拦截器中解析Token之后，使用获得的`dsKey`调用`SaaSDataSource.switchTo`来切换数据源，这样在编写业务代码时就无需关心租户切换问题了，最后不要忘了在拦截器的`afterCompletion`中调用`SaaSDataSource.clearAll`方法（`1.0.0`版本是`SaaSDataSource.clear`）。
 
 ## 更新日志
+
+### 1.4.0
+
+- 更新并适配`dynamic-datasource-spring-boot-starter`至`3.5.1`版本（目前最新版）；
+- 更新并适配`druid-spring-boot-starter`至`1.2.8`版本（目前最新版）；
+- 更新并适配`spring-boot-starter-web`至`2.6.5`版本（目前最新版），但pom scope为`provided`，即最终以你项目中实际使用的`spring-boot`版本为准；
+- 解决可能存在的循环依赖问题，具体细节参见[注意事项](#注意事项)；
+- 去掉了`@SaaS`注解的默认值，现在使用此注解时必须显式指定**租户标识字段名称**。
 
 ### 1.3.0
 
 - 更新并适配`dynamic-datasource-spring-boot-starter`至`3.4.1`版本；
-- 更新并适配`spring-boot-starter-web`至`2.1.1.RELEASE`版本；
+- 更新并适配`spring-boot-starter-web`至`2.1.1.RELEASE`版本，但pom scope为`provided`，即最终以你项目中实际使用的`spring-boot`版本为准；
 - 新增`SaaSDataSourceClassResolver`来解析注解标记的类，原因是`dynamic-datasource-spring-boot-starter`在`3.1.1`版本后删除了本工具之前使用的对应API，所以只能本工具自己再实现一个；
 - 支持`SPI`，开发者可以省略`driverClassName`配置了。
 

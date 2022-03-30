@@ -19,6 +19,7 @@ import com.baomidou.dynamic.datasource.creator.DruidDataSourceCreator;
 import com.baomidou.dynamic.datasource.spring.boot.autoconfigure.DataSourceProperty;
 import com.baomidou.dynamic.datasource.spring.boot.autoconfigure.DynamicDataSourceProperties;
 
+import javax.annotation.Resource;
 import javax.sql.DataSource;
 
 /**
@@ -27,6 +28,9 @@ import javax.sql.DataSource;
  * @author bit
  */
 public class SaaSDataSourceCreator {
+    
+    @Resource
+    private DruidDataSourceCreator druidDataSourceCreator;
     
     private DynamicDataSourceProperties properties;
     
@@ -41,7 +45,6 @@ public class SaaSDataSourceCreator {
      * @return 数据源
      */
     public DataSource createDruidDataSource(DataSourceProperty dataSourceProperty) {
-        DruidDataSourceCreator druidDataSourceCreator = new DruidDataSourceCreator(properties);
         dataSourceProperty.setDruid(properties.getDruid());
         return druidDataSourceCreator.createDataSource(dataSourceProperty);
     }

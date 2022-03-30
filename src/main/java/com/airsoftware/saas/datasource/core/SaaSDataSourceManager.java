@@ -38,7 +38,7 @@ public class SaaSDataSourceManager {
     /**
      * 根据key添加数据源
      *
-     * @param dsKey
+     * @param dsKey 数据源标识
      */
     public void addDataSource(String dsKey) {
         Map<String, DataSource> dsMap = dynamicRoutingDataSource.getDataSources();

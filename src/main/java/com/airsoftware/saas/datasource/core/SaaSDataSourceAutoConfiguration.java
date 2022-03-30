@@ -20,6 +20,7 @@ import com.airsoftware.saas.datasource.provider.SaaSDataSourceProvider;
 import com.baomidou.dynamic.datasource.DynamicRoutingDataSource;
 import com.baomidou.dynamic.datasource.spring.boot.autoconfigure.DynamicDataSourceAutoConfiguration;
 import com.baomidou.dynamic.datasource.spring.boot.autoconfigure.DynamicDataSourceProperties;
+import com.baomidou.dynamic.datasource.spring.boot.autoconfigure.DynamicDatasourceAopProperties;
 import com.baomidou.dynamic.datasource.spring.boot.autoconfigure.druid.DruidDynamicDataSourceConfiguration;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
@@ -28,6 +29,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Lazy;
 
 import javax.annotation.Resource;
 import javax.sql.DataSource;
@@ -47,6 +49,7 @@ public class SaaSDataSourceAutoConfiguration {
 	@Resource
     private DataSource dynamicRoutingDataSource;
 	
+	@Lazy
 	@Resource
 	private SaaSDataSourceProvider saasDataSourceProvider;
 	
@@ -65,7 +68,8 @@ public class SaaSDataSourceAutoConfiguration {
         // 为手动切换工具设置数据源管理器
         SaaSDataSource.setManager(manager);
         
-        advisor.setOrder(properties.getOrder());
+        DynamicDatasourceAopProperties aopProperties = properties.getAop();
+        advisor.setOrder(aopProperties.getOrder());
         return advisor;
     }
 	
