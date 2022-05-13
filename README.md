@@ -4,11 +4,13 @@
 
 **在了解完如何使用后请务必仔细阅读[注意事项](#注意事项)和[最佳实践](#最佳实践)**
 
+**完整解决方案现已重磅发布**！请前往 <a href="https://gitee.com/air-soft/airboot-saas-datasource" target="_blank">Airboot-SaaS-DataSource</a>
+
 简单示例项目请前往 <a href="https://gitee.com/air-soft/saas-datasource-samples" target="_blank">saas-datasource-samples</a>
 
-完整解决方案请前往 <a href="https://gitee.com/air-soft/airboot-saas-datasource" target="_blank">Airboot-SaaS-DataSource</a>
-
 目前`1.x`版本主要支持`Druid`，后续会考虑增加对`HikariCp`、`BeeCp`及`Dbcp2`的支持。
+
+---
 
 ## 介绍
 
@@ -41,10 +43,12 @@
 
 |  saas-datasource-spring-boot-starter   |  dynamic-datasource-spring-boot-starter  |  mybatis-plus-boot-starter  |  mybatis-spring-boot-starter  |
 |  :----:  |  :----:  |  :----:  |  :----:  |
-| 1.4.0  | version in (3.4.1, 3.5.1 (latest)] |  version <= 3.5.1 (latest)  | version <= 2.2.2 (latest) |
+| 1.5.0 & 1.4.0  | version in (3.4.1, 3.5.1 (latest)] |  version <= 3.5.1 (latest)  | version <= 2.2.2 (latest) |
 | 1.3.0  | version in (3.1.1, 3.4.1] |  version <= 3.5.1 (latest)  | version <= 2.2.2 (latest) |
 | 1.2.0  | version in (2.4.2, 3.1.1] |  version <= 3.5.1 (latest)  | version <= 2.2.2 (latest) |
 | 1.1.0 & 1.0.0  | version <= 2.4.2 | <div align="left">根据`@SaaS`注解的位置分为两种情况：<br/>1. 如果注解在Mapper上，则 version <= 3.0.7.1，若高于此版本dynamic-datasource会报错；<br/>2. 如果注解不在Mapper上，则可使用目前最新版本 version <= 3.5.1 (latest)。<br/>按[最佳实践](#最佳实践)，推荐上述第二种情况，注解不要放在Mapper上。</div>  | version <= 2.2.2 (latest) |
+
+---
 
 ## 快速使用
 
@@ -54,7 +58,7 @@
 <dependency>
     <groupId>com.air-software</groupId>
     <artifactId>saas-datasource-spring-boot-starter</artifactId>
-    <version>1.4.0</version>
+    <version>1.5.0</version>
 </dependency>
 ```
 
@@ -62,36 +66,40 @@
 
 通常情况下，我们会将租户数据源配置保存在一个公共库里，**不必担心在切换数据源时会频繁查库**，因为本工具会将已获取过的数据源缓存起来，如果切换时缓存中没有对应数据源，才会查库（具体看你的`SaaSDataSourceProvider`怎么实现）。
 
+当然，**有时我们也需要对数据源缓存池进行管理**，关于这方面参见 [管理数据源缓存池](#管理数据源缓存池150)。
+
 因此，项目启动时的默认数据源推荐配置为公共库，此处的配置风格参照`dynamic-datasource-spring-boot-starter`，举例如下：
 
 ```
 spring:
-  autoconfigure:
-    exclude: com.alibaba.druid.spring.boot.autoconfigure.DruidDataSourceAutoConfigure
   datasource:
     dynamic:
       primary: common
       datasource:
         common:
-          url: jdbc:mysql://localhost/saas_common?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&serverTimezone=GMT%2B8&autoReconnect=true&autoReconnectForPools=true&allowMultiQueries=true
+          url: jdbc:mysql://localhost/saas_common?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&serverTimezone=GMT%2B8&autoReconnect=true&autoReconnectForPools=true&allowMultiQueries=true&allowPublicKeyRetrieval=true
           username: root
           password: 123456
       druid:
-        filters: stat
-        initial-size: 1
+        initial-size: 5
+        min-idle: 10
         max-active: 20
-        max-pool-prepared-statement-per-connection-size: 50
         max-wait: 60000
+        time-between-eviction-runs-millis: 60000
         min-evictable-idle-time-millis: 300000
-        min-idle: 1
-        pool-prepared-statements: true
-        stat-view-servlet:
-          allow: true
+        max-evictable-idle-time-millis: 900000
+        validation-query: select 1 from dual
+        test-while-idle: true
         test-on-borrow: false
         test-on-return: false
-        test-while-idle: true
-        time-between-eviction-runs-millis: 60000
-        validation-query: SELECT 'x'
+```
+
+注意，如果你使用的`dynamic-datasource-spring-boot-starter`版本在`3.3.3`以下，则仍需要手动排除`DruidDataSourceAutoConfigure`。你可以在`@SpringBootApplication`注解中exclude，或者在配置文件中添加：
+
+```
+spring:
+  autoconfigure:
+    exclude: com.alibaba.druid.spring.boot.autoconfigure.DruidDataSourceAutoConfigure
 ```
 
 ### 实现数据源提供者
@@ -119,12 +127,14 @@ public class MySaaSDataSourceProvider implements SaaSDataSourceProvider {
     @Resource
     private SaaSDataSourceCreator saasDataSourceCreator;
     
-    public static String SCHEMA_URL_SUFFIX = "?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&serverTimezone=GMT%2B8&autoReconnect=true&autoReconnectForPools=true&allowMultiQueries=true";
+    public static String JDBC_URL_PREFIX = "jdbc:mysql://";
+    
+    public static String JDBC_URL_SUFFIX = "?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&serverTimezone=GMT%2B8&autoReconnect=true&autoReconnectForPools=true&allowMultiQueries=true&allowPublicKeyRetrieval=true";
     
     @Override
     public DataSource createDataSource(String dsKey) {
         DataSourceConfig dataSourceConfig = dataSourceConfigMapper.selectById(dsKey);
-        String jdbcUrl = dataSourceConfig.getHost() + dataSourceConfig.getSchemaName() + SCHEMA_URL_SUFFIX;
+        String jdbcUrl = JDBC_URL_PREFIX + dataSourceConfig.getHost() + "/" + dataSourceConfig.getSchemaName() + JDBC_URL_SUFFIX;
         
         DataSourceProperty dataSourceProperty = new DataSourceProperty();
         dataSourceProperty.setUrl(jdbcUrl);
@@ -184,7 +194,7 @@ public class UserController {
 }
 ```
 
-比如我在使用注解时设置为`@SaaS("tenantId")`，那么我在Request Session或Header中就需要用`tenantId`字段来设置租户标识，而这个租户标识在首次切换至此租户时，会传递至你自己实现的`SaaSDataSourceProvider`中，以此来获取租户对应数据源。
+比如我在使用注解时设置为`@SaaS("tenantId")`，那么我在Request Session或Header中就需要用`tenantId`字段来设置租户标识，而这个租户标识在首次切换至此租户时，会传递至我自己实现的`SaaSDataSourceProvider`中，以此来获取租户对应数据源。
 
 ### 切换数据源
 
@@ -203,6 +213,16 @@ public class UserController {
 **注意**：在`1.1.0`及以上版本，如果你只使用`SaaSDataSource`来手动切换数据库，则不需要再标记`@SaaS`注解，即使标记了注解，注解中的值也会被忽略。
 
 而在`1.0.0`版本，则仍需要在调用`SaaSDataSource.switchTo`之后的流程中标记`@SaaS`注解，即必须在注解生效前执行`SaaSDataSource.switchTo`。
+
+### 管理数据源缓存池（1.5.0+）
+
+每个数据源都只会在第一次切换时调用到你自己实现的`SaaSDataSourceProvider`，之后就会被缓存。
+
+假设你的数据源配置存在数据库中，你修改了库中的某个数据源配置，但是这个配置已经被缓存了。此时如果你想在**不重新启动服务**的情况下让此数据源使用到最新的配置，可以使用`SaaSDataSourcePool.remove(dsKey)`方法来移除数据源缓存池中的指定数据源。那么下一次再切换至此数据源时就会再次调用你自己实现的`SaaSDataSourceProvider`，获取到最新的配置。
+
+`SaaSDataSourcePool`就是用来管理数据源缓存池的工具，包含了多种操作方法，**注意它仅在1.5.0以上版本可用。**
+
+---
 
 ## 注意事项
 
@@ -226,6 +246,8 @@ spring:
 private SaaSDataSourceCreator saasDataSourceCreator;
 ```
 
+---
+
 ## 最佳实践
 
 基于上述注意事项，结合现代Web开发的技术倾向，可以得出以下几条最佳实践：
@@ -233,13 +255,21 @@ private SaaSDataSourceCreator saasDataSourceCreator;
 - 为保障注解在事务开启前发挥作用，**在Web项目中推荐将`@SaaS`标记在`Controller`层**，一般这就是事务的顶层了。大部分项目中都会有一个`BaseController`作为所有Controller的父类，将`@SaaS`注解标记在父类上，对所有Controller都会起作用。
 - 现代Web项目中使用Token的情况已逐步超过Session，在Token场景下，我们可以将`dsKey`放入Token中，或为安全起见将`dsKey`放入Redis，而Redis Key放入Token中。随后我们在拦截器中解析Token之后，使用获得的`dsKey`调用`SaaSDataSource.switchTo`来切换数据源，这样在编写业务代码时就无需关心租户切换问题了，最后不要忘了在拦截器的`afterCompletion`中调用`SaaSDataSource.clearAll`方法（`1.0.0`版本是`SaaSDataSource.clear`）。
 
+---
+
 ## 更新日志
+
+### 1.5.0
+
+- 新增数据源池工具类`SaaSDataSourcePool`，用于管理已被缓存至池中的数据源，可能的使用场景参见 [管理数据源缓存池](#管理数据源缓存池150)；
+- 更新并适配`druid-spring-boot-starter`至`1.2.9`版本（目前最新版）；
+- 更新并适配`spring-boot-starter-web`至`2.6.7`版本（目前最新版），但pom scope为`provided`，即最终以你项目中实际使用的`spring-boot`版本为准。
 
 ### 1.4.0
 
 - 更新并适配`dynamic-datasource-spring-boot-starter`至`3.5.1`版本（目前最新版）；
-- 更新并适配`druid-spring-boot-starter`至`1.2.8`版本（目前最新版）；
-- 更新并适配`spring-boot-starter-web`至`2.6.5`版本（目前最新版），但pom scope为`provided`，即最终以你项目中实际使用的`spring-boot`版本为准；
+- 更新并适配`druid-spring-boot-starter`至`1.2.8`版本；
+- 更新并适配`spring-boot-starter-web`至`2.6.5`版本，但pom scope为`provided`，即最终以你项目中实际使用的`spring-boot`版本为准；
 - 解决可能存在的循环依赖问题，具体细节参见[注意事项](#注意事项)；
 - 去掉了`@SaaS`注解的默认值，现在使用此注解时必须显式指定**租户标识字段名称**。
 

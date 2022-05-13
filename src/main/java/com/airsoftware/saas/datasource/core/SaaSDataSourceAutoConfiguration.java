@@ -16,6 +16,7 @@
 package com.airsoftware.saas.datasource.core;
 
 import com.airsoftware.saas.datasource.context.SaaSDataSource;
+import com.airsoftware.saas.datasource.context.SaaSDataSourcePool;
 import com.airsoftware.saas.datasource.provider.SaaSDataSourceProvider;
 import com.baomidou.dynamic.datasource.DynamicRoutingDataSource;
 import com.baomidou.dynamic.datasource.spring.boot.autoconfigure.DynamicDataSourceAutoConfiguration;
@@ -62,11 +63,13 @@ public class SaaSDataSourceAutoConfiguration {
         // 设置数据源管理器
         SaaSDataSourceManager manager = new SaaSDataSourceManager();
         manager.setSaasDataSourceProvider(saasDataSourceProvider);
-        manager.setDynamicRoutingDataSource((DynamicRoutingDataSource)dynamicRoutingDataSource);
+        manager.setDynamicRoutingDataSource((DynamicRoutingDataSource) dynamicRoutingDataSource);
         // 为拦截器设置数据源管理器
         interceptor.setManager(manager);
         // 为手动切换工具设置数据源管理器
         SaaSDataSource.setManager(manager);
+        // 为数据源池工具设置核心动态数据源组件
+        SaaSDataSourcePool.setDynamicRoutingDataSource((DynamicRoutingDataSource) dynamicRoutingDataSource);
         
         DynamicDatasourceAopProperties aopProperties = properties.getAop();
         advisor.setOrder(aopProperties.getOrder());

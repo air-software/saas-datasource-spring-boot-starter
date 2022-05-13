@@ -55,6 +55,7 @@ public final class SaaSDataSource {
     
     /**
      * 切换至对应数据源
+     *
      * @param dsKey 数据源标识
      */
     public static void switchTo(String dsKey) {
@@ -63,6 +64,7 @@ public final class SaaSDataSource {
     
     /**
      * 切换至对应数据源
+     *
      * @param dsKey 数据源标识，兼容Long型ID
      */
     public static void switchTo(Long dsKey) {
@@ -71,6 +73,7 @@ public final class SaaSDataSource {
     
     /**
      * 切换至对应数据源
+     *
      * @param dsKey 数据源标识，兼容Integer型ID
      */
     public static void switchTo(Integer dsKey) {
@@ -79,6 +82,7 @@ public final class SaaSDataSource {
     
     /**
      * 添加数据源，并手动设置上下文
+     *
      * @param dsKey
      */
     private static void set(String dsKey) {
